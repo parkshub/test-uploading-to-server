@@ -1,36 +1,42 @@
-PORT = 8000
+// if you want this to work you have to manually input "type": "module" in your package.json
+// there could be other ways, but fetch wouldn't work
+// the below 'imports blah1 from blah2' is the same as const blah1 = require('blah2')
 
-cors = require('cors')
+import fetch from 'node-fetch'
+import dotenv from 'dotenv'
+import {MongoClient} from 'mongodb'
+dotenv.config()
 
-express = require('express')
-app = express()
-app.use(cors())
-app.set('view engine', 'ejs')
-app.use(express.static('public'))
-app.use(express.urlencoded({ extended: true }))
-app.use(express.json())
+async function getIt() {
+    try {
+        const response = await fetch('https://futuramaapi.herokuapp.com/api/quotes')
+        const data = await response.json()
+        return data
+    } catch(e) {
+        console.error(e)
+    }
+}
 
-const MongoClient = require('mongodb').MongoClient
-require('dotenv').config()
+const docs = await getIt()
 
-let db,
-    infoCollection,
-    dbConnectionStr = process.env.DB_STRING,
-    dbName = 'test';
+console.log(docs)
+
+async function main() {    
+
+    const client = new MongoClient(process.env.DB_STRING)
     
-MongoClient.connect(dbConnectionStr)
-    .then(client => {
-        console.log('we in boys')
-        db = client.db(dbName)
-        infoCollection = db.collection('futurama')
-    })
+    try {
+        await client.connect();
+        const db = client.db('test')
+        const infoCollection = db.collection('futurama')
+        await infoCollection.insertMany(docs)
+    } catch (e) {
+        console.error(e)
+    
+    } finally {
+        console.log('all done. closing')
+        await client.close()
+    }
+}
 
-infoCollection.find().toArray()
-    .then(data => {
-        console.log(data)
-    })
-    .catch(err => console.error(err))
-
-app.listen(PORT, () => {
-    console.log(`running on port ${PORT}`)
-})
+main().catch(console.error)
